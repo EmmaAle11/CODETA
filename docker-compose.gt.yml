@@ -1,0 +1,38 @@
+# ============================================================================
+# GT — Fragmento de composición para INCRUSTAR en el monolito SIPCA/Doxia.
+#
+# Este archivo define SOLO los servicios propios de GT (backend + frontend).
+# Postgres y Keycloak se asumen YA EXISTENTES en el monolito y se referencian
+# por la red compartida `doxia-net`. Así GT es "una conexión más".
+#
+# Uso (desde la raíz del monolito, combinando composiciones):
+#   docker compose -f docker-compose.yml -f gt/docker-compose.gt.yml up -d
+# ============================================================================
+
+services:
+  gt-backend:
+    build: ./gt/backend
+    image: doxia/gt-backend:1.0.0
+    env_file: ./gt/backend/.env
+    environment:
+      # Apunta a los servicios compartidos del monolito
+      PGHOST: postgres
+      KEYCLOAK_ISSUER: http://keycloak:8080/realms/doxia
+      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/doxia/protocol/openid-connect/certs
+    networks: [doxia-net]
+    depends_on: []          # postgres/keycloak los provee el monolito
+    restart: unless-stopped
+    # El gateway del monolito enruta /api/gt -> este servicio :4010
+
+  gt-frontend:
+    build: ./gt/frontend
+    image: doxia/gt-frontend:1.0.0
+    env_file: ./gt/frontend/.env
+    networks: [doxia-net]
+    depends_on: [gt-backend]
+    restart: unless-stopped
+    # El gateway del monolito enruta /gt -> este servicio :5173
+
+networks:
+  doxia-net:
+    external: true          # red creada por el compose principal del monolito

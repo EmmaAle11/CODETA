@@ -1,0 +1,62 @@
+# ============================================================================
+# GT — Composición STANDALONE para desarrollo local aislado.
+#
+# Levanta todo el stack por su cuenta (Postgres + Keycloak + backend + frontend)
+# para poder trabajar en GT sin el resto del monolito.
+#
+#   docker compose -f docker-compose.standalone.yml up -d
+#
+# Nota: en producción NO se usa este archivo; ahí Postgres y Keycloak los
+# provee el monolito (ver docker-compose.gt.yml).
+# ============================================================================
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: doxia
+      POSTGRES_PASSWORD: doxia
+      POSTGRES_DB: doxia
+    ports: ["5432:5432"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Las migraciones de GT se aplican al iniciar (orden alfabético)
+      - ./db/migrations:/docker-entrypoint-initdb.d
+    networks: [doxia-net]
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:25.0
+    command: start-dev --import-realm
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    ports: ["8080:8080"]
+    volumes:
+      - ./keycloak:/opt/keycloak/data/import  # coloca aquí el realm export si lo tienes
+    networks: [doxia-net]
+
+  gt-backend:
+    build: ./backend
+    env_file: ./backend/.env
+    environment:
+      PGHOST: postgres
+      KEYCLOAK_ISSUER: http://keycloak:8080/realms/doxia
+      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/doxia/protocol/openid-connect/certs
+      GT_CORS_ORIGINS: http://localhost:5173
+    ports: ["4010:4010"]
+    depends_on: [postgres, keycloak]
+    networks: [doxia-net]
+
+  gt-frontend:
+    build: ./frontend
+    env_file: ./frontend/.env
+    ports: ["5173:5173"]
+    depends_on: [gt-backend]
+    networks: [doxia-net]
+
+volumes:
+  pgdata:
+
+networks:
+  doxia-net:
+    driver: bridge
