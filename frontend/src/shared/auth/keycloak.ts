@@ -1,11 +1,12 @@
 import Keycloak from 'keycloak-js';
+import { config } from '../config/env';
 
 // Cliente Keycloak del frontend. Usa el MISMO realm del monolito Doxia,
 // para que GT sea "una conexión más" bajo el Auth central.
 export const keycloak = new Keycloak({
-  url: import.meta.env.VITE_KEYCLOAK_URL || 'http://localhost:8080',
-  realm: import.meta.env.VITE_KEYCLOAK_REALM || 'doxia',
-  clientId: import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'gt-frontend',
+  url: config.keycloak.url,
+  realm: config.keycloak.realm,
+  clientId: config.keycloak.clientId,
 });
 
 let inicializado = false;
@@ -24,5 +25,7 @@ export async function initAuth(): Promise<boolean> {
   return ok;
 }
 
-export const getToken = () => keycloak.token;
+// Con la auth apagada no hay cliente inicializado y `keycloak.token` es
+// undefined: el cliente HTTP se apoya en eso para no mandar un Bearer vacío.
+export const getToken = () => (config.authOff ? undefined : keycloak.token);
 export const logout = () => keycloak.logout();

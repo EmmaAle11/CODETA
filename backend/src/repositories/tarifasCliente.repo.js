@@ -1,4 +1,14 @@
 import { pool, query } from '../config/db.js';
+import { errorDeNegocio, conflictoPorUnico } from './errores.js';
+
+// Columnas que una transición puede traer consigo (firma, documentos, OCR).
+// Lista blanca: `extra` viene del cuerpo de la petición y se concatena como
+// nombre de columna, que no se puede parametrizar. Sin esta lista, cualquier
+// usuario autenticado podría inyectar SQL por la clave del objeto.
+const COLUMNAS_EXTRA = new Set([
+  'firma', 'doc_agencia_url', 'doc_cliente_url', 'verificacion_reporte',
+  'vigencia_tipo', 'vigencia_inicio', 'vigencia_fin',
+]);
 
 const TRANSICIONES = {
   captura:    ['generada'],
@@ -8,6 +18,10 @@ const TRANSICIONES = {
   validacion: ['archivada'],
   archivada:  [],
 };
+
+// Índice uq_tc_llave_activa: impide dos tarifas no archivadas para el mismo
+// cliente y la misma combinación de aduana + operación + modalidad.
+const UNICO_TARIFA_ACTIVA = 'uq_tc_llave_activa';
 
 export const tarifasClienteRepo = {
   async listar({ estado, rfc, aduana, operacion, modalidad, nivel, enProceso } = {}) {
@@ -70,7 +84,11 @@ export const tarifasClienteRepo = {
       return rows[0];
     } catch (e) {
       await client.query('ROLLBACK');
-      throw e;
+      // Sin esto la violación del índice único sale como un 500 "Error interno"
+      // que no le dice nada a quien está capturando la tarifa.
+      const conflicto = conflictoPorUnico(e, UNICO_TARIFA_ACTIVA,
+        'Ya existe una tarifa en proceso para este cliente en esta aduana/operación/modalidad.');
+      throw conflicto ?? e;
     } finally {
       client.release();
     }
@@ -101,9 +119,7 @@ export const tarifasClienteRepo = {
     if (!actual) return null;
     const permitidos = TRANSICIONES[actual.estado] || [];
     if (!permitidos.includes(nuevoEstado)) {
-      const e = new Error(`Transición no permitida: ${actual.estado} → ${nuevoEstado}`);
-      e.status = 409;
-      throw e;
+      throw errorDeNegocio(409, `Transición no permitida: ${actual.estado} → ${nuevoEstado}`);
     }
     const client = await pool.connect();
     try {
@@ -111,8 +127,11 @@ export const tarifasClienteRepo = {
       // Campos extra opcionales que acompañan la transición (firma, docs, verificación)
       const sets = ['estado = $2'];
       const params = [id, nuevoEstado];
-      for (const [col, val] of Object.entries(extra)) {
-        params.push(typeof val === 'object' ? JSON.stringify(val) : val);
+      for (const [col, val] of Object.entries(extra || {})) {
+        if (!COLUMNAS_EXTRA.has(col)) continue;
+        // null es 'object' en JS: pasarlo por JSON.stringify guardaría la
+        // cadena "null" en vez de un NULL de verdad.
+        params.push(val !== null && typeof val === 'object' ? JSON.stringify(val) : val);
         sets.push(`${col} = $${params.length}`);
       }
       const { rows } = await client.query(

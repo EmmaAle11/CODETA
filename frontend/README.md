@@ -1,32 +1,56 @@
 # GT · Gestor de Tarifas — Frontend
 
-`index.html` **es el artefacto compilado** del Gestor de Tarifas: contiene los
-mismos estilos, componentes y reglas que la versión HTML entregada (React, CSS y
-lógica embebidos, sin dependencias externas salvo la fuente Poppins).
+Aplicación real (Vite + React + TypeScript) **conectada al backend de GT**.
+Estructura Feature-Sliced Design:
 
-## Correr en desarrollo (lo pedido: `npx vite --host`)
+```
+src/app/        arranque, proveedor de sesión, App
+src/pages/      Inicio · Tarifas Generales · Tarifas por Cliente
+src/widgets/    tablas (generales, cliente)
+src/features/   crear-tarifa-general · crear-tarifa-cliente · avanzar-estado · emitir-tarifa
+src/entities/   tarifa (tipos, ciclo de vida, API) · aduana (tipos, API)
+src/shared/     cliente HTTP, auth, config, primitivos de UI (sin librería externa)
+```
+
+## Desarrollo
+
 ```bash
 cp .env.example .env
 npm install
-npx vite --host      # sirve el artefacto en http://<tu-ip>:5173
+npm run dev          # http://localhost:5173, con proxy /api -> localhost:4010
+npm run typecheck    # tsc --noEmit
+npm run build        # genera dist/
 ```
 
-## Servir en producción (Docker)
-El artefacto ya está compilado, así que se sirve estático (sin build):
+Sin un Keycloak a mano, `VITE_AUTH=off` en `.env` salta el login (solo pruebas).
+
+## Producción: un solo puerto
+
+El backend sirve `dist/` desde su mismo proceso cuando se define
+`GT_FRONTEND_DIST`. Eso deja la app y la API en el mismo origen —sin CORS— y es
+lo que permite exponer GT por un túnel con una sola URL:
+
 ```bash
-docker build -t doxia/gt-frontend .
-docker run -p 5173:5173 doxia/gt-frontend
+cd frontend && npm run build
+cd ../backend && GT_FRONTEND_DIST=../frontend/dist npm start
 ```
-El gateway del monolito enruta `/gt → gt-frontend:5173`.
 
-## Capa de integración (src/)
-El artefacto hoy funciona 100% en memoria (igual que el HTML original). Para
-conectarlo al backend del monolito cuando se disponga del código fuente React:
+| Ruta   | Sirve                                                     |
+|--------|-----------------------------------------------------------|
+| `/`    | la app conectada al backend (antes servía el artefacto)   |
+| `/app` | lo mismo (fallback SPA)                                    |
+| `/demo`| `public/gt-artefacto.html`, el bundle en memoria anterior  |
+| `/api` | la API                                                     |
 
-- `src/auth/keycloak.ts` — login con el realm `doxia` (Keycloak compartido).
-- `src/api/client.ts` — fetch con Bearer token automático.
-- `src/api/tarifas.ts` — CRUD de tarifas, ciclo de vida y endpoint del Cotizador.
+El backend inyecta `window.__GT__` en el shell en tiempo de ejecución, así que
+**una misma imagen** sirve con Keycloak (monolito) y con la auth apagada
+(pruebas), sin recompilar el bundle.
 
-Estas piezas son el "puente" hacia la API: se importan desde el código fuente del
-artefacto para sustituir el estado en memoria por llamadas reales. No se usan
-mientras se sirve el artefacto compilado tal cual.
+La imagen Docker de este directorio se conserva para el despliegue de dos
+servicios del monolito (gateway `/gt` → `:5173`); hace el build y sirve `dist/`.
+
+## El artefacto anterior
+
+`public/gt-artefacto.html` es el bundle compilado que ocupaba la raíz y corría
+100% en memoria del navegador (0 llamadas `fetch`). Se conserva intacto como
+referencia y se sirve en `/demo`; ya no es la pantalla principal.

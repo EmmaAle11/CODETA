@@ -30,6 +30,16 @@ r.post('/', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// Editar los montos de una tarifa general. La llave (aduana/operación/
+// modalidad) no se toca: ver el comentario de tarifasGeneralesRepo.actualizar.
+r.patch('/:id', async (req, res, next) => {
+  try {
+    const upd = await tarifasGeneralesRepo.actualizar(req.params.id, req.body);
+    if (!upd) return res.status(404).json({ error: 'No encontrada' });
+    res.json(upd);
+  } catch (e) { next(e); }
+});
+
 r.delete('/:id', async (req, res, next) => {
   try {
     await tarifasGeneralesRepo.eliminar(req.params.id);

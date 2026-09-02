@@ -3,6 +3,7 @@ import { requireAuth, requireRole } from '../middleware/auth.js';
 import tarifasGenerales from './tarifasGenerales.routes.js';
 import tarifasCliente from './tarifasCliente.routes.js';
 import cotizador from './cotizador.routes.js';
+import aduanas from './aduanas.routes.js';
 
 const api = Router();
 
@@ -15,5 +16,6 @@ api.use(requireAuth, requireRole());
 api.use('/tarifas-generales', tarifasGenerales);
 api.use('/tarifas-cliente', tarifasCliente);
 api.use('/cotizador', cotizador);
+api.use('/aduanas', aduanas);
 
 export default api;

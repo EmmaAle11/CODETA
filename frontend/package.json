@@ -2,18 +2,25 @@
   "name": "@doxia/gt-frontend",
   "version": "1.0.0",
   "private": true,
-  "description": "GT · Gestor de Tarifas — Frontend. Sirve el artefacto compilado (mismos estilos, componentes y reglas) con Vite.",
+  "description": "GT · Gestor de Tarifas — Frontend (Vite + React) conectado a la API del módulo.",
   "type": "module",
   "scripts": {
     "dev": "vite --host",
     "preview": "vite preview --host",
-    "build": "vite build"
+    "build": "vite build",
+    "typecheck": "tsc --noEmit"
   },
-  "//": "index.html es el artefacto autocontenido (React/CSS/lógica embebidos). keycloak-js solo lo usa la capa de integración en src/ al conectar el backend.",
-  "devDependencies": {
-    "vite": "^5.4.0"
-  },
+  "//": "public/gt-artefacto.html es el bundle en memoria anterior; se conserva y el backend lo sirve en /demo.",
   "dependencies": {
-    "keycloak-js": "^25.0.0"
+    "keycloak-js": "^25.0.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^4.3.1",
+    "typescript": "^5.5.4",
+    "vite": "^5.4.0"
   }
 }
