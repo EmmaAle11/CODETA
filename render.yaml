@@ -1,0 +1,34 @@
+# Blueprint de Render. Crea el servicio y su Postgres, y aplica las migraciones
+# antes de conmutar el trafico.
+#
+#   Render -> New -> Blueprint -> apuntar a este repositorio (rama main).
+#
+# GT_AUTH=off deja la API ABIERTA: es el modo de pruebas (igual que el fork de
+# CODETA). Para el modo real dentro del monolito (Keycloak, dos servicios),
+# ver docs/arquitectura.md — este Blueprint es solo el modo "un solo servicio".
+services:
+  - type: web
+    name: gt-gestor-tarifas
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /api/health
+    # Sin preDeployCommand a proposito: Render solo lo admite en instancias de
+    # PAGO. Las migraciones las aplica el CMD del contenedor al arrancar.
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: gt-db
+          property: connectionString
+      - key: GT_AUTH
+        value: "off"
+      - key: GT_DB_SCHEMA
+        value: tarifas
+      - key: NODE_ENV
+        value: production
+
+databases:
+  - name: gt-db
+    databaseName: doxia
+    user: doxia
+    plan: free
